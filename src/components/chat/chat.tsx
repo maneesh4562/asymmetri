@@ -1,17 +1,26 @@
 "use client"
 
-import { useChat } from "ai/react"
-import { useEffect, useRef } from "react"
+// 'ai/react' is not production ready or not installed. Commenting out chat feature for now.
+// import { useChat } from "ai/react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
-export function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/chat",
-  })
+type Message = {
+  role: "user" | "assistant"
+  content: string
+}
 
+export function Chat() {
+  // const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  //   api: "/api/chat",
+  // })
+
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -37,6 +46,56 @@ export function Chat() {
     }
   }, [messages])
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+
+    const userMessage = { role: "user" as const, content: input }
+    setMessages(prev => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [...messages, userMessage] }),
+      })
+
+      if (!response.ok) throw new Error("Failed to send message")
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error("No reader available")
+
+      let assistantMessage = ""
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = new TextDecoder().decode(value)
+        assistantMessage += chunk
+        setMessages(prev => {
+          const newMessages = [...prev]
+          const lastMessage = newMessages[newMessages.length - 1]
+          if (lastMessage.role === "assistant") {
+            lastMessage.content = assistantMessage
+          } else {
+            newMessages.push({ role: "assistant", content: assistantMessage })
+          }
+          return newMessages
+        })
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+      setMessages(prev => [
+        ...prev,
+        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col space-y-4">
       <ScrollArea className="flex-1 rounded-lg border bg-background p-4">
@@ -61,7 +120,7 @@ export function Chat() {
         <Input
           placeholder="Type your message..."
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           disabled={isLoading}
         />
         <Button type="submit" disabled={isLoading}>

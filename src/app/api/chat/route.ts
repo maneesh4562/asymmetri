@@ -1,46 +1,91 @@
-import { OpenAIStream, StreamingTextResponse } from "ai"
 import { Configuration, OpenAIApi } from "openai-edge"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth"
 
-const configuration = new Configuration({
+const config = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 })
-
-const openai = new OpenAIApi(configuration)
-
-export const runtime = "edge"
+const openai = new OpenAIApi(config)
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 })
+    }
 
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 })
-  }
+    const { messages } = await req.json()
+    const response = await openai.createChatCompletion({
+      model: "gpt-3.5-turbo",
+      stream: true,
+      messages: messages.map((message: any) => ({
+        content: message.content,
+        role: message.role,
+      })),
+    })
 
-  const json = await req.json()
-  const { messages } = json
+    // Create a TransformStream to handle the streaming response
+    const encoder = new TextEncoder()
+    const decoder = new TextDecoder()
 
-  const response = await openai.createChatCompletion({
-    model: "gpt-4",
-    stream: true,
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert web developer specializing in creating beautiful and responsive landing pages.
-        When responding to user requests, always provide complete HTML and CSS code that can be directly used.
-        Focus on creating modern, clean designs with proper spacing, typography, and color schemes.
-        Use Tailwind CSS classes for styling.
-        Always wrap your response in a complete HTML document structure.
-        Make sure the code is responsive and works well on all devices.
-        Include proper meta tags and viewport settings.
-        Use semantic HTML elements.
-        Optimize for performance and accessibility.`,
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = response.body?.getReader()
+        if (!reader) {
+          controller.close()
+          return
+        }
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              controller.close()
+              break
+            }
+
+            const chunk = decoder.decode(value)
+            const lines = chunk
+              .split('\n')
+              .filter(line => line.trim() !== '')
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6)
+                if (data === '[DONE]') {
+                  controller.close()
+                  break
+                }
+
+                try {
+                  const parsed = JSON.parse(data)
+                  const content = parsed.choices[0]?.delta?.content
+                  if (content) {
+                    controller.enqueue(encoder.encode(content))
+                  }
+                } catch (e) {
+                  console.error('Error parsing JSON:', e)
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error reading stream:', e)
+          controller.error(e)
+        } finally {
+          reader.releaseLock()
+        }
       },
-      ...messages,
-    ],
-  })
+    })
 
-  const stream = OpenAIStream(response)
-  return new StreamingTextResponse(stream)
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+      },
+    })
+  } catch (error) {
+    console.error("[CHAT_ERROR]", error)
+    return new Response("Internal Server Error", { status: 500 })
+  }
 } 
