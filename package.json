@@ -1,0 +1,51 @@
+{
+  "name": "asymmetr-i",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.9.1",
+    "@hookform/resolvers": "^5.1.0",
+    "@prisma/client": "^6.9.0",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-toast": "^1.2.14",
+    "ai": "^4.3.16",
+    "bcrypt": "^6.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "crypto-browserify": "^3.12.1",
+    "lucide-react": "^0.513.0",
+    "next": "15.3.3",
+    "next-auth": "^4.24.11",
+    "openai": "^5.1.1",
+    "openai-edge": "^1.2.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.57.0",
+    "stream-browserify": "^3.0.0",
+    "tailwind-merge": "^3.3.0",
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^5.0.2",
+    "@types/next-auth": "^3.13.0",
+    "@types/node": "^20.19.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.3",
+    "prisma": "^6.9.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
